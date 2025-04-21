@@ -10,7 +10,6 @@
     }
     canvas {
       display: block;
-      background-color: #ADD8E6; /* Light Blue */
       touch-action: none;
     }
   </style>
@@ -21,6 +20,9 @@
 <script>
 const canvas = document.getElementById("stickerCanvas");
 const ctx = canvas.getContext("2d");
+
+const background = new Image();
+background.src = "https://raw.githubusercontent.com/rbarney3/Bluey/main/IMG_1149.png";
 
 const stickers = [
   { src: "https://raw.githubusercontent.com/rbarney3/Bluey/main/IMG_1144.png", x: 100, y: 100, w: 170, h: 200 },
@@ -51,6 +53,11 @@ function loadStickers(callback) {
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (background.complete) {
+    ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+  }
+
   stickers.forEach((sticker, index) => {
     ctx.drawImage(images[index], sticker.x, sticker.y, sticker.w, sticker.h);
   });
@@ -123,7 +130,9 @@ canvas.addEventListener("touchmove", e => {
 canvas.addEventListener("touchend", () => dragging = null);
 canvas.addEventListener("touchcancel", () => dragging = null);
 
-loadStickers(draw);
+background.onload = () => {
+  loadStickers(draw);
+};
 </script>
 </body>
 </html>
