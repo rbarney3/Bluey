@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Bluey Beach Sticker Page</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    #stickerCanvas {
+      display: block;
+      touch-action: none;
+    }
+    #thumbnailBar {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #eee;
+      padding: 5px;
+      overflow-x: auto;
+    }
+    .thumb {
+      width: 100px;
+      height: 75px;
+      margin: 0 5px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      object-fit: cover;
+    }
+    .thumb:hover {
+      border: 2px solid #007BFF;
+    }
+  </style>
+</head>
+<body>
+<canvas id="stickerCanvas" width="1024" height="700"></canvas>
+
+<div id="thumbnailBar">
+  <img class="thumb" src="https://raw.githubusercontent.com/rbarney3/Bluey/main/IMG_1149.png" data-src="IMG_1149.png" alt="BG1">
+  <img class="thumb" src="https://raw.githubusercontent.com/rbarney3/Bluey/main/IMG_1150.png" data-src="IMG_1150.png" alt="BG2">
+  <img class="thumb" src="https://raw.githubusercontent.com/rbarney3/Bluey/main/IMG_1151.png" data-src="IMG_1151.png" alt="BG3">
+  <img class="thumb" src="https://raw.githubusercontent.com/rbarney3/Bluey/main/IMG_1152.png" data-src="IMG_1152.png" alt="BG4">
+  <img class="thumb" src="https://raw.githubusercontent.com/rbarney3/Bluey/main/IMG_1153.png" data-src="IMG_1153.png" alt="BG5">
+  <img class="thumb" src="https://raw.githubusercontent.com/rbarney3/Bluey/main/IMG_1154.png" data-src="IMG_1154.png" alt="BG6">
+</div>
+
+<script>
+const canvas = document.getElementById("stickerCanvas");
+const ctx = canvas.getContext("2d");
+
+const background = new Image();
+background.src = "https://raw.githubusercontent.com/rbarney3/Bluey/main/IMG_1149.png"; // Default
+
+const stickers = [
+  { src: "https://raw.githubusercontent.com/rbarney3/Bluey/main/IMG_1144.png", x: 100, y: 100, w: 170, h: 200 },
+  { src: "https://raw.githubusercontent.com/rbarney3/Bluey/main/IMG_1145.png", x: 300, y: 150, w: 170, h: 200 },
+  { src: "https://raw.githubusercontent.com/rbarney3/Bluey/main/IMG_1146.png", x: 500, y: 150, w: 170, h: 200 },
+  { src: "https://raw.githubusercontent.com/rbarney3/Bluey/main/IMG_1147.png", x: 700, y: 150, w: 170, h: 200 }
+];
+
+let images = [];
+let dragging = null;
+let offsetX, offsetY;
+
+function loadStickers(callback) {
+  let loaded = 0;
+  stickers.forEach((sticker, index) => {
+    const img = new Image();
+    img.src = sticker.src;
+    img.onload = () => {
+      images[index] = img;
+      loaded++;
+      if (loaded === stickers.length) callback();
+    };
+    img.onerror = () => {
+      console.error("Could not load", sticker.src);
+    };
+  });
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (background.complete) {
+    ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+  }
+  stickers.forEach((sticker, index) => {
+    ctx.drawImage(images[index], sticker.x, sticker.y, sticker.w, sticker.h);
+  });
+}
+
+function getTouchPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const touch = e.touches[0];
+  return {
+    x: touch.clientX - rect.left,
+    y: touch.clientY - rect.top
+  };
+}
+
+canvas.addEventListener("mousedown", e => {
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+
+  for (let i = stickers.length - 1; i >= 0; i--) {
+    const s = stickers[i];
+    if (mouseX >= s.x && mouseX <= s.x + s.w &&
+        mouseY >= s.y && mouseY <= s.y + s.h) {
+      dragging = i;
+      offsetX = mouseX - s.x;
+      offsetY = mouseY - s.y;
+      break;
+    }
+  }
+});
+
+canvas.addEventListener("mousemove", e => {
+  if (dragging === null) return;
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+  stickers[dragging].x = mouseX - offsetX;
+  stickers[dragging].y = mouseY - offsetY;
+  draw();
+});
+
+canvas.addEventListener("mouseup", () => dragging = null);
+canvas.addEventListener("mouseleave", () => dragging = null);
+
+canvas.addEventListener("touchstart", e => {
+  e.preventDefault();
+  const pos = getTouchPos(e);
+  for (let i = stickers.length - 1; i >= 0; i--) {
+    const s = stickers[i];
+    if (pos.x >= s.x && pos.x <= s.x + s.w &&
+        pos.y >= s.y && pos.y <= s.y + s.h) {
+      dragging = i;
+      offsetX = pos.x - s.x;
+      offsetY = pos.y - s.y;
+      break;
+    }
+  }
+});
+
+canvas.addEventListener("touchmove", e => {
+  if (dragging === null) return;
+  e.preventDefault();
+  const pos = getTouchPos(e);
+  stickers[dragging].x = pos.x - offsetX;
+  stickers[dragging].y = pos.y - offsetY;
+  draw();
+});
+
+canvas.addEventListener("touchend", () => dragging = null);
+canvas.addEventListener("touchcancel", () => dragging = null);
+
+background.onload = () => {
+  loadStickers(draw);
+};
+
+// Handle background thumbnail clicks
+document.querySelectorAll('.thumb').forEach(thumb => {
+  thumb.addEventListener('click', () => {
+    const fileName = thumb.getAttribute('data-src');
+    background.src = `https://raw.githubusercontent.com/rbarney3/Bluey/main/${fileName}`;
+    background.onload = draw;
+  });
+});
+</script>
+</body>
+</html>
