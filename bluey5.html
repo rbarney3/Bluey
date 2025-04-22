@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Bluey Beach Sticker Page</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+      touch-action: none;
+      background: #000;
+    }
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 0;
+    }
+    #clearBtn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 12px 18px;
+      background-color: #ff6f61;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      z-index: 10;
+      box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+    }
+    #bgThumbnails, #stickerTray {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 6px;
+      z-index: 5;
+      overflow-x: auto;
+      overflow-y: hidden;
+      max-height: 100px;
+    }
+    #bgThumbnails img, #stickerTray img {
+      height: 80px;
+      margin: 4px;
+      cursor: pointer;
+      border-radius: 6px;
+      border: 2px solid transparent;
+      pointer-events: auto;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+    #bgThumbnails img:hover, #stickerTray img:hover {
+      border: 2px solid #ff6f61;
+    }
+  </style>
+</head>
+<body>
+  <button id="clearBtn">Clear All</button>
+  <canvas id="stickerCanvas"></canvas>
+  <div id="stickerTray"></div>
+  <div id="bgThumbnails"></div>
+
+  <script>
+    const canvas = document.getElementById("stickerCanvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    let stickers = [];
+    let dragging = null;
+    let offsetX, offsetY;
+    let rotateKey = false;
+    let pinchStartDistance = null;
+    let pinchStartAngle = null;
+    let initialScale = null;
+    let initialRotation = null;
+
+    const stickerSources = [
+      "IMG_1144.png", "IMG_1145.png", "IMG_1146.png", "IMG_1147.png",
+      "IMG_1155.png", "IMG_1156.png", "IMG_1157.png", "IMG_1158.png",
+      "IMG_1159.png", "IMG_1160.png", "IMG_1161.png", "IMG_1162.png"
+    ];
+
+    const bgImages = [
+      "IMG_1149.png", "IMG_1150.png", "IMG_1151.png",
+      "IMG_1152.png", "IMG_1153.png", "IMG_1154.png"
+    ];
+
+    let background = new Image();
+    background.src = `https://raw.githubusercontent.com/rbarney3/Bluey/main/IMG_1149.png`;
+
+    background.onload = () => draw();
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+      stickers.forEach(s => {
+        ctx.save();
+        ctx.translate(s.x + s.w / 2, s.y + s.h / 2);
+        ctx.rotate(s.rotation);
+        ctx.scale(s.scale, s.scale);
+        ctx.drawImage(s.img, -s.w / 2, -s.h / 2, s.w, s.h);
+        ctx.restore();
+      });
+    }
+
+    function createStickerTray() {
+      const tray = document.getElementById("stickerTray");
+      stickerSources.forEach(src => {
+        const img = new Image();
+        img.src = `https://raw.githubusercontent.com/rbarney3/Bluey/main/${src}`;
+        img.draggable = false;
+        img.addEventListener("click", () => {
+          const sticker = {
+            img: img,
+            x: 100,
+            y: canvas.height - 200,
+            w: 150,
+            h: 150,
+            rotation: 0,
+            scale: 1
+          };
+          stickers.push(sticker);
+          draw();
+        });
+        tray.appendChild(img);
+      });
+    }
+
+    function createBGThumbnails() {
+      const container = document.getElementById("bgThumbnails");
+      bgImages.forEach(src => {
+        const img = new Image();
+        img.src = `https://raw.githubusercontent.com/rbarney3/Bluey/main/${src}`;
+        img.draggable = false;
+        img.addEventListener("click", () => {
+          background.src = `https://raw.githubusercontent.com/rbarney3/Bluey/main/${src}`;
+        });
+        container.appendChild(img);
+      });
+    }
+
+    // Mouse Events
+    canvas.addEventListener("mousedown", e => {
+      const { x, y } = getMousePos(e);
+      startDrag(x, y);
+    });
+    canvas.addEventListener("mousemove", e => {
+      if (dragging !== null) moveDrag(getMousePos(e));
+    });
+    canvas.addEventListener("mouseup", () => dragging = null);
+
+    // Touch Events
+    canvas.addEventListener("touchstart", e => {
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        const pos = getTouchPos(touch);
+        startDrag(pos.x, pos.y);
+      } else if (e.touches.length === 2) {
+        const touch1 = getTouchPos(e.touches[0]);
+        const touch2 = getTouchPos(e.touches[1]);
+        pinchStartDistance = getDistance(touch1, touch2);
+        pinchStartAngle = getAngle(touch1, touch2);
+        if (dragging !== null) {
+          initialScale = stickers[dragging].scale;
+          initialRotation = stickers[dragging].rotation;
+        }
+      }
+    });
+
+    canvas.addEventListener("touchmove", e => {
+      if (e.touches.length === 1 && dragging !== null) {
+        const pos = getTouchPos(e.touches[0]);
+        moveDrag(pos);
+      } else if (e.touches.length === 2 && dragging !== null) {
+        const touch1 = getTouchPos(e.touches[0]);
+        const touch2 = getTouchPos(e.touches[1]);
+        const currentDistance = getDistance(touch1, touch2);
+        const currentAngle = getAngle(touch1, touch2);
+
+        const s = stickers[dragging];
+        s.scale = initialScale * (currentDistance / pinchStartDistance);
+        s.scale = Math.max(0.2, Math.min(3, s.scale));
+        s.rotation = initialRotation + (currentAngle - pinchStartAngle);
+        draw();
+      }
+    });
+
+    canvas.addEventListener("touchend", () => dragging = null);
+    canvas.addEventListener("touchcancel", () => dragging = null);
+
+    // Resize canvas on window resize
+    window.addEventListener("resize", () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      draw();
+    });
+
+    // Wheel to Scale
+    canvas.addEventListener("wheel", (e) => {
+      if (dragging === null) return;
+      e.preventDefault();
+      const s = stickers[dragging];
+      s.scale += e.deltaY < 0 ? 0.1 : -0.1;
+      s.scale = Math.max(0.2, Math.min(3, s.scale));
+      draw();
+    });
+
+    // Keyboard Rotate
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "r" || e.key === "R") rotateKey = true;
+    });
+    window.addEventListener("keyup", () => rotateKey = false);
+
+    // Clear All
+    document.getElementById("clearBtn").addEventListener("click", () => {
+      stickers = [];
+      draw();
+    });
+
+    // Helpers
+    function getMousePos(e) {
+      const rect = canvas.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+
+    function getTouchPos(touch) {
+      const rect = canvas.getBoundingClientRect();
+      return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+    }
+
+    function getDistance(p1, p2) {
+      return Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+    }
+
+    function getAngle(p1, p2) {
+      return Math.atan2(p2.y - p1.y, p2.x - p1.x);
+    }
+
+    function startDrag(x, y) {
+      for (let i = stickers.length - 1; i >= 0; i--) {
+        const s = stickers[i];
+        const dx = x - (s.x + s.w / 2);
+        const dy = y - (s.y + s.h / 2);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < s.w * s.scale) {
+          dragging = i;
+          offsetX = dx;
+          offsetY = dy;
+          break;
+        }
+      }
+    }
+
+    function moveDrag(pos) {
+      const s = stickers[dragging];
+      s.x = pos.x - s.w / 2 - offsetX;
+      s.y = pos.y - s.h / 2 - offsetY;
+      if (rotateKey) s.rotation += 0.05;
+      draw();
+    }
+
+    createStickerTray();
+    createBGThumbnails();
+  </script>
+</body>
+</html>
+  
